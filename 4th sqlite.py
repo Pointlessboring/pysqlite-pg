@@ -28,3 +28,7 @@ if __name__ == '__main__':
     rows = cursor.execute("SELECT name, species, tank_number FROM fish").fetchall()
     print(rows)
 
+
+    # Wrapping up DB  
+    cursor.close()
+
