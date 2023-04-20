@@ -7,10 +7,16 @@
 #
 # Concept refresher: iterators 
 #
+# ToDo: Clean-up/Format EXCEL file. Add header row. 
 
 import sqlite3
 import csv
+import time
+from openpyxl import Workbook
 from datetime import date, datetime, timedelta
+
+# mark start time for measurement
+start_time = time.time()
 
 # Inital message. 
 print(f"\nToday is {date.today().strftime('%A %B %d, the %jth day of %Y')}.\n")
@@ -25,7 +31,6 @@ cursor = conn.cursor()
 # Check if listing table exist, otherwise create it
 print("Validating if LISTING table exists in the database.")
 tables = cursor.execute("SELECT name from sqlite_schema").fetchall()
-print(tables)
 
 if tables == [] or ('listing',) not in tables:      
 
@@ -65,8 +70,6 @@ if tables == [] or ('listing',) not in tables:
 
 # Check if calendar table exist, otherwise create it
 print("Validating if CALENDAR table exists in the database.")
-tables = cursor.execute("SELECT name from sqlite_schema WHERE type = 'TABLE' ").fetchall()
-
 
 if tables == [] or ('calendar',) not in tables:      
 
@@ -104,11 +107,41 @@ if tables == [] or ('calendar',) not in tables:
     conn.commit()
 
 #########
-#
-# Next steps... Perform data treatment here... 
+# Perform data treatment here... 
+
+sqlstring = ("SELECT t1.listing_id, t1.maxprice, t2.name, t2.picture_url, t2.host_name, t2.host_picture_url, t2.neighbourhood_group_cleansed, t2.latitude, t2.longitude "
+            "FROM (SELECT listing_id, max(price) AS maxprice from calendar GROUP by listing_id) as t1 "
+            "JOIN (SELECT id, name, picture_url, host_name, host_picture_url, neighbourhood_group_cleansed, latitude, longitude FROM listing) as t2 "
+            "ON t1.listing_id = t2.id")
+data = cursor.execute(sqlstring).fetchall()
+
+#####################################
+# Write data back to excel file/sheet
 #
 
+print("Saving Data into an Excel workbook.")
+wb = Workbook()
+ws = wb.active
+ws.title = "NY Airbnb max price per listing"
 
+x = 0
+for line in data:
+    x += 1
+    y = 0
+    for element in line:
+        y += 1
+        fixed_element = element
+        # testing for special case where element starts with '=' which causes error as EXCEL believes it is a formula. 
+        if element != "" and element[0] == "=":
+            fixed_element = "'" + fixed_element
+        ws.cell(row = x, column = y, value = fixed_element)
+
+# Saving to excel file. 
+wb.save('UselessAirBnBFile.xlsx')
 
 # Clean-up. Closing connections
+print("Wrapping up.")
 conn.close()
+
+# Calculating elapsed time since marker
+print(f"Elapsed time: {round(time.time()-start_time,2)} seconds")
