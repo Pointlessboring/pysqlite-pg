@@ -24,6 +24,13 @@ xlname = basename + ".xlsx"               # Excel file
 with open(logname, 'a') as f:
     f.write(f'{datetime.now().strftime("%y-%m-%d %X")} Launching Daily grind program...\n')
 
+# open DB Connection
+conn = sqlite3.Connection(dbname)
+cursor = conn.cursor()
+
+# Get list of tables from DB, create them if they are not there.
+# To be continued tomorrow...
+
 # Close final 
 with open(logname, 'a') as f:
     f.write(f'{datetime.now().strftime("%y-%m-%d %X")} Ending Daily grind program.\n')
