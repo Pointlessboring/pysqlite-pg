@@ -2,15 +2,17 @@
 # Daily Grind...
 # 
 
-import sqlite3, csv, time, tkinter
+import sqlite3, csv, time
+import tkinter as tk
 from datetime import date, datetime, timedelta
 
 def english_ord(n):
-    """ simple function to return the English Ordinal Suffix: st, nd, rd, th"""
-    return f"{n}"+ ("th" if (n%100) not in [11,12,13] else ( ["st", "nd", "rd"][n%10-1]))
+    return str(n) + ("th" if ((n%100) in [11,12,23]) else (["th", "st", "nd", "rd"]+["th"]*7)[n%10])
 
 # Start timer to measure elapsed time later
 start_timer = time.time()
+
+print(english_ord(3))
 
 # Greet user, display date.
 daynum = english_ord(int(date.today().strftime('%j')))
@@ -22,6 +24,6 @@ logfile = basename + ".log"
 dbfile = basename + ".db"
 xlfile = basename + ".xlsx"
 
-window = tkinter.Tk()
-greeting = tkinter.Label(text="Hello, Tkinter")
-time.sleep(20)
+window = tk.Tk()
+greeting = tk.Label(text="Hello, Tkinter")
+tk.mainloop()
