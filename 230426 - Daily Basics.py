@@ -7,22 +7,17 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Protection, Font
 
 def english_ord(n):
-    """ Return string of n followed by the appropriate English Ordinal Suffix. """
+    """ return string of n followed by the appropriate English Ordinal Suffix"""
     return str(n) + ("th" if ((n%100) in [11,12,23]) else (["th", "st", "nd", "rd"]+["th"]*7)[n%10])
 
-def write_log (filename, msg):
-    """ This function writes a msg to a log file and prints it on screen. """
-    dated_msg = f'{datetime.now().strftime("%y-%m-%d %X")} {msg}'
-    with open(filename, 'a') as f:
-        f.write(dated_msg)
-    print(dated_msg+'\n')
-
 def importdata(dbname, tablename, csvname, logname, label):
-    """ Function to import csv file into a DB. """    
+    """ Function to import csv file into a DB """    
 
     write_log(logname, f"Validating if {label} table exists in the database.")
+    print(f"Validating if {label} table exists in the database.")
 
     # Get list of tables from DB, create them if they are not there.
+    
     write_log(logname, f"Opening DB: {dbname}")
     conn = sqlite3.Connection(dbname) # open DB Connection
     cursor = conn.cursor()   
@@ -34,48 +29,57 @@ def importdata(dbname, tablename, csvname, logname, label):
         # Having confirmed that the table is not there, proceed with importing the csv file
         with open(csvname) as csvfile:
             csv_reader = csv.reader(csvfile, delimiter=',')
-            csvDB = tuple(csv_reader)                       # csv_reader is an iterator. csvDB is not a tuple.
-
+            csvDB = tuple(csv_reader) # csv_reader is an iterator. csvDB is not a tuple.
         write_log(logname, f"Reading CSV file: {csvname}")
 
-        fieldnames = csvDB[0]                               # Get csv file info: # of fields, header names, etc.
-        sqlstring = f"CREATE TABLE {tablename} ("           # Beginning of SQL CREATE command
+        fieldnames = csvDB[0]       # Get csv file info: # of fields, header names, etc.
+        sqlstring = f"CREATE TABLE {tablename} ("            # Beginning of SQL CREATE command
         for field in fieldnames:
-            sqlstring += " '" + field + "' TEXT,"           # Add the various fields to create
+            sqlstring += " '" + field + "' TEXT,"         # Add the various field to create
    
-        sqlstring = sqlstring[:-1] + ")"                    # Remove last comma and close the bracket
+        sqlstring = sqlstring[:-1] + ")"                # Remove last comma and close the bracket
         cursor.execute(sqlstring)
         
         write_log(logname, f"Creating {label} table into the database.")
+        print(f"Creating {label} table into the database.")
 
+        ###############################################
         # Populate the database with data from CSV file
-        write_log(logname, f"Populating {label} table into the database.")
 
+        write_log(logname, f"Populating {label} table into the database.")
         fieldnamestring = "'" + "', '".join(fieldnames) + "'"
         nbfields = len(fieldnames)
         for row in csvDB[1:]:
             sqlstring = f"INSERT INTO {tablename} ({fieldnamestring}) VALUES ({('?,' * nbfields)[:-1]})"
             cursor.execute(sqlstring, row)
+
     conn.commit()
     conn.close()
     write_log(logname, f"{label} table was created and populated into the database {dbname}.")
 
-##################
-# main section
+def write_log (filename, msg):
+    """ This function writes a msg to a log file"""
+    with open(filename, 'a') as f:
+        f.write(f'{datetime.now().strftime("%y-%m-%d %X")} {msg}\n')
+
 
 start_time = time.time()
 
-# Generating temporary filenames from today's date
+# Generating temporary file name from today's date
 basename = "Useless"+date.today().strftime("%y%m%d")
 logname = basename + ".log"
 dbname = basename + ".db"
 xlname = basename + ".xlsx"
 
-write_log(logname,f"Welcome! Today is: {date.today().strftime(f'%A %B ')}"+
+write_log(logname, "Begin processing...")
+
+# Print greeting and today's date with correct english ordinal for day and day number.
+print(f"Welcome! Today is: {date.today().strftime(f'%A %B ')}"+
                             english_ord(int(date.today().strftime('%d')))+
                             f", the {english_ord(int(date.today().strftime('%j')))}"+
                             f" day of {date.today().strftime('%Y')}"
                             )
+
 importdata(dbname, "products", "Datasets/ShopDB/products.csv", logname, "PRODUCTS")
 importdata(dbname, "orders", "Datasets/ShopDB/orders.csv", logname, "ORDERS")
 importdata(dbname, "sales", "Datasets/ShopDB/sales.csv", logname, "SALES")
@@ -97,15 +101,18 @@ data = cursor.execute(sqlstring).fetchall()
 headerrow = [description[0] for description in cursor.description]
 write_log(logname, "Processing data...")
 
+#####################################
 # Write data back to excel file/sheet
-write_log(logname, "Creating an Excel workbook.")
+#
+write_log(logname, "Saving Data into an Excel workbook.")
 
+print("Saving Data into an Excel workbook.")
 wb = Workbook()
 ws = wb.active
 ws.title = "Shop Dataset"
 
+#
 write_log(logname, "Writing Data into an Excel sheet.")
-
 x = 0
 for line in data:
     x += 1
@@ -121,14 +128,6 @@ for line in data:
 # Adjusting the column width 
 write_log(logname, "Formatting Excel sheet column width.")
 
-# fix this next line... for column > 7
-for colname in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'I', 'J', 'K']:
-    maxsize = 0
-    for cell in ws[colname]:
-        if cell.value !=None:
-            maxsize = max(maxsize, len(cell.value))
-    ws.column_dimensions[colname].width = maxsize + 5
-
 # Inserting the header row
 ws.insert_rows(1)
 for y in range(0,len(headerrow)):
@@ -137,6 +136,13 @@ for y in range(0,len(headerrow)):
     mycell.font = Font(bold=True)
     mycell.alignment = Alignment(horizontal="center", vertical="center")
     mycell.fill = PatternFill("solid", fgColor="DDDDDD")
+
+# Resize columns ['A', 'B', ... ] for the length of headerrow. 
+for colname in [chr(i) for i in range(65,91)][:len(headerrow)]:
+    maxsize = 0
+    for cell in ws[colname]:
+        maxsize = max(maxsize, len(cell.value))
+    ws.column_dimensions[colname].width = maxsize + 5
 
 write_log(logname, "Inserting and formatting header row.")
 
@@ -147,16 +153,8 @@ write_log(logname, "Saving Excel file to disk.")
 
 # Clean-up. Closing connections
 write_log(logname, "Wrapping up...")
-
-print("Wrapping up.\n")
 conn.close()
 
-# Close final 
-with open(logname, 'a') as f:
-    f.write(f'{datetime.now().strftime("%y-%m-%d %X")} Ending Daily grind program.\n')
-
 # Calculating elapsed time. Notice the float to 2 decimal place formatting
-final_msg = f"Total runtime was: {(time.time()-start_time):.2f} seconds\n"
-print(final_msg)
-
+final_msg = f"Ending Daily grind program. Total runtime was: {(time.time()-start_time):.2f} seconds\n"
 write_log(logname, final_msg)
