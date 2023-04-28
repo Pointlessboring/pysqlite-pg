@@ -1,5 +1,9 @@
 #############
 # Daily Grind
+#
+# ToDo: Format resulting xlsx file. number format, etc...
+# ToDo: Try sums, group by, etc. in the SQL query
+# ToDo: Improve the readability of the BIG SQL query
 
 import csv, sqlite3, time
 from datetime import date, datetime, timedelta
@@ -10,14 +14,19 @@ def english_ord(n):
     """ return string of n followed by the appropriate English Ordinal Suffix"""
     return str(n) + ("th" if ((n%100) in [11,12,23]) else (["th", "st", "nd", "rd"]+["th"]*7)[n%10])
 
+def write_log (filename, msg):
+    """ This function writes a msg to a log file and prints it on screen. """
+    dated_msg = f'{datetime.now().strftime("%y-%m-%d %X")} {msg}'
+    with open(filename, 'a') as f:
+        f.write(dated_msg)
+    print(dated_msg)
+    
 def importdata(dbname, tablename, csvname, logname, label):
     """ Function to import csv file into a DB """    
 
     write_log(logname, f"Validating if {label} table exists in the database.")
-    print(f"Validating if {label} table exists in the database.")
 
     # Get list of tables from DB, create them if they are not there.
-    
     write_log(logname, f"Opening DB: {dbname}")
     conn = sqlite3.Connection(dbname) # open DB Connection
     cursor = conn.cursor()   
@@ -57,12 +66,6 @@ def importdata(dbname, tablename, csvname, logname, label):
     conn.close()
     write_log(logname, f"{label} table was created and populated into the database {dbname}.")
 
-def write_log (filename, msg):
-    """ This function writes a msg to a log file"""
-    with open(filename, 'a') as f:
-        f.write(f'{datetime.now().strftime("%y-%m-%d %X")} {msg}\n')
-
-
 start_time = time.time()
 
 # Generating temporary file name from today's date
@@ -94,7 +97,40 @@ write_log(logname, "Finished importing data...")
 conn = sqlite3.Connection(dbname)
 cursor = conn.cursor()
 
-sqlstring = "SELECT * FROM customers"
+
+# Is there a more elegant/readable way to do this SQL string?
+ 
+sqlstring = """
+SELECT t5.customer_name, t5.city, t5.order_id, t5.order_date, t5.delivery_date, t5.price_per_unit, t5.quantity, t5.total_price, t6.product_id, t6.product_type, t6.product_name, t6.description
+FROM (SELECT product_id, product_type, product_name, description FROM products) as T6
+JOIN (SELECT t4.customer_name, t4.city, t3.order_id, t3.order_date, t3.delivery_date, t3.product_id, t3.price_per_unit, t3.quantity, t3.total_price
+			 FROM (SELECT t2.customer_id, t2.order_id, t2.order_date, t2.delivery_date, t1.product_id, t1.price_per_unit, t1.quantity, t1.total_price
+							FROM (SELECT order_id, product_id, price_per_unit, quantity, total_price FROM sales) as T1
+							JOIN (SELECT customer_id, order_id, order_date, delivery_date from orders) as T2
+							ON t1. order_id  = t2.order_id) as T3
+			JOIN (SELECT customer_id, customer_name, city FROM customers) as T4
+			ON t3.customer_id = t4.customer_id) as T5
+ON t5.product_id = t6.product_id 
+"""
+
+### This SQL query is an equivalent but not much more readable...
+"""
+WITH sales_data AS (SELECT order_id, product_id, price_per_unit, quantity, total_price FROM sales) ,
+order_data AS (SELECT customer_id, order_id, order_date, delivery_date FROM orders) ,
+customer_data AS (SELECT customer_id, customer_name, city FROM customers),
+product_data AS (SELECT product_id, product_type, product_name, description FROM products)
+
+SELECT *
+FROM (SELECT *
+				FROM (SELECT *
+								FROM (SELECT * FROM sales_data) as t1
+								JOIN (SELECT * FROM order_data) as t2
+								ON t1.order_id = t2.order_id) as t3
+				JOIN (SELECT * from customer_data) as t4
+				ON t3.customer_id = t4.customer_id) as t5
+JOIN (SELECT * FROM product_data) as t6
+ON t5.product_id = t6.product_id
+"""
 
 data = cursor.execute(sqlstring).fetchall()
 
@@ -107,7 +143,6 @@ write_log(logname, "Processing data...")
 #
 write_log(logname, "Saving Data into an Excel workbook.")
 
-print("Saving Data into an Excel workbook.")
 wb = Workbook()
 ws = wb.active
 ws.title = "Shop Dataset"
